@@ -1,0 +1,137 @@
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
+<script>
+	var socket = io.connect('http://localhost:8080');
+
+	// on connection to server, ask for user's name with an anonymous callback
+	socket.on('connect', function(){
+		// call the server-side function 'adduser' and send one parameter (value of prompt)
+		socket.emit('adduser',prompt('username'));
+	});
+
+	// listener, whenever the server emits 'updatechat', this updates the chat body
+	socket.on('updatechat', function (username, data) {
+		$('#conversation').append('<b>'+username + ':</b> ' + data + '<br>');
+	});
+
+	// listener, whenever the server emits 'updateusers', this updates the username list
+	socket.on('updateusers', function(data) {
+		$('#users').empty();
+		$.each(data, function(key, value) {
+			$('#users').append('<div>' + key + '</div>');
+		});
+	});
+
+	// on load of page
+	$(function(){
+		// when the client clicks SEND
+		$('#datasend').click( function() {
+			var message = $('#data').val();
+			$('#data').val('');
+			// tell server to execute 'sendchat' and send along one parameter
+			socket.emit('sendchat', message);
+		});
+
+		// when the client hits ENTER on their keyboard
+		$('#data').keypress(function(e) {
+			if(e.which == 13) {
+				$(this).blur();
+				$('#datasend').focus().click();
+			}
+		});
+	});
+  //draw function
+  socket.on('draw', function(x, y, drag, color){
+    context.clearRect(0, 0, context.canvas.width, context.canvas.height); // Clears the canvas
+    
+    context.lineJoin = "round";
+    context.lineWidth = 5;
+    for (var key in x){
+      context.strokeStyle = color[key];
+      for(var i=0; i < x[key].length; i++) {    
+        context.beginPath();
+        if(drag[key][i] && i){
+          context.moveTo(x[key][i-1], y[key][i-1]);
+         }else{
+           context.moveTo(x[key][i]-1, y[key][i]);
+         }
+         context.lineTo(x[key][i], y[key][i]);
+         context.closePath();
+         context.stroke();
+      }
+    }
+  });
+
+//
+//
+// canvas script
+//
+//
+
+var paint;
+function prepareCanvas(){
+
+  context = document.getElementById('canvasDiv').getContext("2d");
+  canvas = document.getElementById('canvasDiv');
+  canvas.width = 490;
+  canvas.height = 220;
+
+
+  $('#canvasDiv').mousedown(function(e){
+  var mouseX = e.pageX - this.offsetLeft;
+  var mouseY = e.pageY - this.offsetTop;
+  
+  paint = true;
+  addClick(e.pageX - this.offsetLeft, e.pageY - this.offsetTop);
+  socket.emit('redraw');
+  });
+
+  $('#canvasDiv').mousemove(function(e){
+    if(paint){
+      addClick(e.pageX - this.offsetLeft, e.pageY - this.offsetTop, true);
+      socket.emit('redraw');
+    }
+  });
+
+  $('#canvasDiv').mouseup(function(e){
+    paint = false;
+  });
+
+  $('#canvasDiv').mouseleave(function(e){
+    paint = false;
+  }); 
+  $('#clearCanvas').mousedown(function(e){
+    socket.emit('clear');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+  });
+}
+
+function addClick(x, y, dragging)
+{
+  socket.emit('updatecanvas', x, y, dragging)
+}
+
+</script>
+
+<div style="float:right;width:100px;border-right:1px solid black;height:300px;padding:10px;overflow:scroll-y;">
+	<b>USERS</b>
+	<div id="users"></div>
+</div>
+<div style="float:right;width:300px;height:250px;overflow:scroll-y;padding:10px;">
+	<div id="conversation"></div>
+	<input id="data" style="width:200px;" />
+	<input type="button" id="datasend" value="send" />
+</div>
+
+<h1>Drawing Room</h1>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.js"></script>
+<!--[if IE]><script type="text/javascript" src="excanvas.js"></script><![endif]-->
+<script type="text/javascript"></script>
+<body>
+  <canvas style = "float: left;border:1px solid #000000;" id="canvasDiv">
+  </canvas>
+  <script type="text/javascript"> $(document).ready(function() {
+  	 prepareCanvas();
+  });</script>
+<button id = "clearCanvas" type = "button">Clear Canvas</button>
+</body>
